@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Словарь{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/words">Словарь</a>
+    <a href="/words/new">Добавить слово</a>
+    <a href="/import">Импорт фото</a>
+    <a href="/stats">Статистика</a>
+  </nav>
+  {% block content %}{% endblock %}
+</body>
+</html>

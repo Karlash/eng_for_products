@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Словарь{% endblock %}
+{% block content %}
+<h1>Словарь ({{ total }})</h1>
+
+<form class="filters" method="get" action="/words">
+  <select name="status" onchange="this.form.submit()">
+    <option value="">Все статусы</option>
+    {% for s in ["new", "learning", "learned"] %}
+      <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <select name="topic" onchange="this.form.submit()">
+    <option value="">Все темы</option>
+    {% for t in topics %}
+      <option value="{{ t }}" {% if topic == t %}selected{% endif %}>{{ t }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" name="q" placeholder="Поиск..." value="{{ q or '' }}">
+  <button type="submit">Фильтр</button>
+  {% if status or topic or q %}<a class="btn secondary" href="/words">Сбросить</a>{% endif %}
+</form>
+
+{% if words %}
+<table>
+  <thead>
+    <tr>
+      <th>English</th>
+      <th>Russian</th>
+      <th>Тема</th>
+      <th>Статус</th>
+      <th>✓ / ✗</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for w, p in words %}
+    <tr>
+      <td><a class="row-link" href="/words/{{ w.id }}">{{ w.english }}</a></td>
+      <td>{{ w.russian }}</td>
+      <td class="muted">{{ w.topic or "—" }}</td>
+      <td><span class="badge {{ p.status }}">{{ p.status }}</span></td>
+      <td class="muted">{{ p.total_correct }} / {{ p.total_wrong }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">Ничего не найдено.</p>
+{% endif %}
+
+<div class="pagination">
+  {% if page > 1 %}<a class="btn secondary" href="/words?{{ qs(page=page-1) }}">← Назад</a>{% endif %}
+  <span class="muted">Стр. {{ page }} из {{ total_pages }}</span>
+  {% if page < total_pages %}<a class="btn secondary" href="/words?{{ qs(page=page+1) }}">Вперёд →</a>{% endif %}
+</div>
+{% endblock %}

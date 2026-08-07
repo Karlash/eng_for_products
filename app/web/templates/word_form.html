@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Добавить слово{% endblock %}
+{% block content %}
+<h1>Добавить слово</h1>
+{% if error %}<p style="color:#d9534f">{{ error }}</p>{% endif %}
+<form class="stacked" method="post" action="/words/new">
+  <label>English
+    <input type="text" name="english" required value="{{ form.english if form else '' }}">
+  </label>
+  <label>Russian
+    <input type="text" name="russian" required value="{{ form.russian if form else '' }}">
+  </label>
+  <label>Часть речи
+    <select name="part_of_speech">
+      <option value="">—</option>
+      {% for pos in ["noun", "verb", "adjective", "adverb", "phrase", "other"] %}
+        <option value="{{ pos }}" {% if form and form.part_of_speech == pos %}selected{% endif %}>{{ pos }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Тема
+    <input type="text" name="topic" placeholder="product-management, IT/tech, ..." value="{{ form.topic if form else '' }}">
+  </label>
+  <label>Заметки / пример
+    <textarea name="notes" rows="3">{{ form.notes if form else '' }}</textarea>
+  </label>
+  <button type="submit">Добавить</button>
+</form>
+{% endblock %}

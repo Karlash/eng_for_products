@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Статистика{% endblock %}
+{% block content %}
+<h1>Статистика</h1>
+<div class="stat-grid">
+  <div class="stat-card"><div class="value">{{ total_words }}</div><div class="label">Всего слов</div></div>
+  <div class="stat-card"><div class="value">{{ status_counts.new }}</div><div class="label">Новых</div></div>
+  <div class="stat-card"><div class="value">{{ status_counts.learning }}</div><div class="label">Учатся</div></div>
+  <div class="stat-card"><div class="value">{{ status_counts.learned }}</div><div class="label">Выучено</div></div>
+</div>
+
+<h2>По темам</h2>
+{% if topic_counts %}
+<table>
+  <thead><tr><th>Тема</th><th>Кол-во слов</th></tr></thead>
+  <tbody>
+    {% for topic, count in topic_counts %}
+    <tr><td>{{ topic or "без темы" }}</td><td>{{ count }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">Пока нет слов.</p>
+{% endif %}
+
+<h2>Точность ответов</h2>
+<p>{{ total_correct }} правильных / {{ total_wrong }} неправильных
+  {% if total_correct + total_wrong > 0 %}
+    ({{ (100 * total_correct / (total_correct + total_wrong)) | round(1) }}%)
+  {% endif %}
+</p>
+{% endblock %}

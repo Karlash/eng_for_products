@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ word.english }}{% endblock %}
+{% block content %}
+<p><a class="muted" href="/words">← Ко всему словарю</a></p>
+<h1>{{ word.english }} — {{ word.russian }}</h1>
+<p>
+  <span class="badge {{ progress.status }}">{{ progress.status }}</span>
+  <span class="muted">{{ word.part_of_speech or "" }} · {{ word.topic or "без темы" }} · источник: {{ word.source }}</span>
+</p>
+
+<div class="stat-grid">
+  <div class="stat-card"><div class="value">{{ progress.correct_count_in_cycle }}/4</div><div class="label">В текущем цикле</div></div>
+  <div class="stat-card"><div class="value">{{ progress.total_correct }}</div><div class="label">Правильно всего</div></div>
+  <div class="stat-card"><div class="value">{{ progress.total_wrong }}</div><div class="label">Неправильно всего</div></div>
+  <div class="stat-card"><div class="value">{{ progress.next_review_at.strftime("%d.%m.%Y") if progress.next_review_at else "—" }}</div><div class="label">Следующий повтор</div></div>
+</div>
+
+{% if word.notes %}<p class="muted">{{ word.notes }}</p>{% endif %}
+
+<form method="post" action="/words/{{ word.id }}/delete" onsubmit="return confirm('Удалить слово?');" style="margin-bottom:1.5rem;">
+  <button type="submit" class="secondary">Удалить слово</button>
+</form>
+
+<h2>История ответов</h2>
+{% if answers %}
+<table>
+  <thead>
+    <tr><th>Дата</th><th>Направление</th><th>Ответ</th><th>Результат</th><th>Кем проверено</th></tr>
+  </thead>
+  <tbody>
+    {% for a in answers %}
+    <tr>
+      <td class="muted">{{ a.asked_at.strftime("%d.%m.%Y %H:%M") }}</td>
+      <td>{{ "EN→RU" if a.direction == "en_to_ru" else "RU→EN" }}</td>
+      <td>{{ a.user_answer or "—" }}</td>
+      <td>{{ "✅" if a.was_correct else "❌" }}</td>
+      <td class="muted">{{ a.judged_by or "—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">Ещё не было ответов на это слово.</p>
+{% endif %}
+{% endblock %}
