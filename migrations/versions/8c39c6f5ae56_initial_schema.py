@@ -29,7 +29,7 @@ def upgrade() -> None:
     sa.Column('topic', sa.String(length=100), nullable=True),
     sa.Column('source', sa.String(length=20), nullable=False),
     sa.Column('notes', sa.Text(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_words_english'), 'words', ['english'], unique=False)
@@ -38,7 +38,7 @@ def upgrade() -> None:
     op.create_table('answer_log',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('word_id', sa.Integer(), nullable=False),
-    sa.Column('asked_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('asked_at', sa.DateTime(), nullable=False),
     sa.Column('direction', sa.String(length=10), nullable=False),
     sa.Column('user_answer', sa.Text(), nullable=True),
     sa.Column('was_correct', sa.Boolean(), nullable=False),
@@ -51,7 +51,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('pending_word_id', sa.Integer(), nullable=True),
     sa.Column('pending_direction', sa.String(length=10), nullable=True),
-    sa.Column('pending_asked_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('pending_asked_at', sa.DateTime(), nullable=True),
     sa.Column('pending_import_json', sa.Text(), nullable=True),
     sa.ForeignKeyConstraint(['pending_word_id'], ['words.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -61,13 +61,13 @@ def upgrade() -> None:
     sa.Column('word_id', sa.Integer(), nullable=False),
     sa.Column('status', sa.String(length=20), nullable=False),
     sa.Column('correct_count_in_cycle', sa.Integer(), nullable=False),
-    sa.Column('cycle_start_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('last_asked_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('next_review_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('learned_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('cycle_start_at', sa.DateTime(), nullable=True),
+    sa.Column('last_asked_at', sa.DateTime(), nullable=True),
+    sa.Column('next_review_at', sa.DateTime(), nullable=True),
+    sa.Column('learned_at', sa.DateTime(), nullable=True),
     sa.Column('total_correct', sa.Integer(), nullable=False),
     sa.Column('total_wrong', sa.Integer(), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), nullable=False),
     sa.ForeignKeyConstraint(['word_id'], ['words.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('word_id', name='uq_learning_progress_word_id')

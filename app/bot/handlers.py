@@ -3,15 +3,10 @@ from aiogram.filters import Command
 from aiogram.types import Message
 from sqlalchemy import func, select
 
+from app.bot.practice import get_bot_state, send_practice_word
 from app.db import async_session
-from app.models import BotState, LearningProgress, Word, utcnow
-from app.services.progress import (
-    expected_answer,
-    judge_exact,
-    pick_direction,
-    pick_word_for_practice,
-    record_answer,
-)
+from app.models import LearningProgress, Word
+from app.services.progress import expected_answer, judge_exact, record_answer
 
 router = Router()
 
@@ -25,15 +20,6 @@ HELP_TEXT = (
 )
 
 
-async def _get_bot_state(session) -> BotState:
-    state = await session.get(BotState, 1)
-    if state is None:
-        state = BotState(id=1)
-        session.add(state)
-        await session.flush()
-    return state
-
-
 @router.message(Command("start", "help"))
 async def cmd_help(message: Message) -> None:
     await message.answer(HELP_TEXT)
@@ -42,22 +28,11 @@ async def cmd_help(message: Message) -> None:
 @router.message(Command("next"))
 async def cmd_next(message: Message) -> None:
     async with async_session() as session:
-        word = await pick_word_for_practice(session)
-        if word is None:
-            await message.answer("В словаре пока нет слов. Добавьте через /add.")
-            return
-        direction = pick_direction()
-        state = await _get_bot_state(session)
-        state.pending_word_id = word.id
-        state.pending_direction = direction
-        state.pending_asked_at = utcnow()
-        await session.commit()
-
-    if direction == "en_to_ru":
-        text = f"🇬🇧 {word.english}\n\nПереведи на русский:"
-    else:
-        text = f"🇷🇺 {word.russian}\n\nTranslate to English:"
-    await message.answer(text)
+        sent = await send_practice_word(message.bot, message.chat.id, session)
+    if not sent:
+        await message.answer(
+            "Сейчас нечего повторять, а дневной лимит новых слов исчерпан (или словарь пуст). Загляните позже."
+        )
 
 
 @router.message(Command("add"))
@@ -109,7 +84,7 @@ async def handle_photo(message: Message) -> None:
 @router.message(F.text)
 async def handle_answer(message: Message) -> None:
     async with async_session() as session:
-        state = await _get_bot_state(session)
+        state = await get_bot_state(session)
         if state.pending_word_id is None:
             await message.answer("Сейчас не жду ответа. Используйте /next, чтобы получить слово.")
             return
