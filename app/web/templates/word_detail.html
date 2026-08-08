@@ -17,9 +17,18 @@
 
 {% if word.notes %}<p class="muted">{{ word.notes }}</p>{% endif %}
 
-<div style="display:flex; gap:0.6rem; margin-bottom:1.5rem;">
+<div style="display:flex; gap:0.6rem; margin-bottom:1.5rem; flex-wrap:wrap;">
   <a class="btn secondary" href="/words/{{ word.id }}/edit">Редактировать</a>
-  <form method="post" action="/words/{{ word.id }}/delete" onsubmit="return confirm('Удалить слово?');">
+  {% if progress.status == "learned" %}
+  <form method="post" action="/words/{{ word.id }}/relearn">
+    <button type="submit" class="secondary">Учить заново</button>
+  </form>
+  {% else %}
+  <form method="post" action="/words/{{ word.id }}/mark_learned">
+    <button type="submit" class="secondary">Отметить как выученное</button>
+  </form>
+  {% endif %}
+  <form method="post" action="/words/{{ word.id }}/delete" onsubmit="return confirm('Удалить слово? Оно больше никогда не будет предложено ботом.');">
     <button type="submit" class="secondary">Удалить слово</button>
   </form>
 </div>

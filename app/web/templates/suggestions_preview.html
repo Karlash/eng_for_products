@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Проверка подобранных слов{% endblock %}
+{% block content %}
+<h1>Подобранные слова</h1>
+
+{% if items %}
+<p class="muted">Найдено {{ items|length }} новых слов (уже существующие и ранее удалённые пропущены автоматически). Снимите галочки с лишних и подтвердите.</p>
+<form method="post" action="/suggestions/confirm">
+  <table>
+    <thead>
+      <tr><th></th><th>English</th><th>Russian</th><th>Часть речи</th><th>Тема</th></tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td><input type="checkbox" name="include_{{ loop.index0 }}" checked></td>
+        <td>
+          <input type="hidden" name="english_{{ loop.index0 }}" value="{{ item.english }}">
+          {{ item.english }}
+        </td>
+        <td>
+          <input type="hidden" name="russian_{{ loop.index0 }}" value="{{ item.russian }}">
+          {{ item.russian }}
+        </td>
+        <td>
+          <input type="hidden" name="part_of_speech_{{ loop.index0 }}" value="{{ item.part_of_speech }}">
+          {{ item.part_of_speech or "—" }}
+        </td>
+        <td class="muted">
+          <input type="hidden" name="topic_{{ loop.index0 }}" value="{{ item.topic }}">
+          {{ item.topic or "—" }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div style="margin-top:1rem;">
+    <button type="submit">Добавить выбранные</button>
+    <a class="btn secondary" href="/suggestions">Отмена</a>
+  </div>
+</form>
+{% else %}
+<p class="muted">Claude не предложил новых слов (возможно, все подходящие уже есть в словаре).</p>
+<a class="btn secondary" href="/suggestions">Попробовать ещё раз</a>
+{% endif %}
+{% endblock %}

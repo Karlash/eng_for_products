@@ -9,9 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db import get_session
-from app.models import AnswerLog, LearningProgress, Word
-from app.services.claude_client import ocr_extract_words
+from app.models import AnswerLog, ExcludedWord, LearningProgress, Word, utcnow
+from app.services.claude_client import SuggestedWord, ocr_extract_words
 from app.services.dedup import filter_new_pairs
+from app.services.suggestions import generate_candidates, insert_words
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -187,9 +188,38 @@ async def edit_word(
 async def delete_word(word_id: int, session: AsyncSession = Depends(get_session)):
     word = await session.get(Word, word_id)
     if word is not None:
+        session.add(
+            ExcludedWord(english_key=word.english.strip().lower(), russian_key=word.russian.strip().lower())
+        )
         await session.delete(word)
         await session.commit()
     return RedirectResponse(url="/words", status_code=303)
+
+
+@router.post("/words/{word_id}/mark_learned")
+async def mark_word_learned(word_id: int, session: AsyncSession = Depends(get_session)):
+    progress = await session.scalar(select(LearningProgress).where(LearningProgress.word_id == word_id))
+    if progress is not None:
+        progress.status = "learned"
+        progress.correct_count_in_cycle = 0
+        progress.cycle_start_at = None
+        progress.next_review_at = None
+        progress.learned_at = utcnow()
+        await session.commit()
+    return RedirectResponse(url=f"/words/{word_id}", status_code=303)
+
+
+@router.post("/words/{word_id}/relearn")
+async def relearn_word(word_id: int, session: AsyncSession = Depends(get_session)):
+    progress = await session.scalar(select(LearningProgress).where(LearningProgress.word_id == word_id))
+    if progress is not None:
+        progress.status = "new"
+        progress.correct_count_in_cycle = 0
+        progress.cycle_start_at = None
+        progress.next_review_at = None
+        progress.learned_at = None
+        await session.commit()
+    return RedirectResponse(url=f"/words/{word_id}", status_code=303)
 
 
 @router.get("/import")
@@ -251,6 +281,53 @@ async def import_confirm(request: Request, session: AsyncSession = Depends(get_s
 
     await session.commit()
     return RedirectResponse(url="/words", status_code=303)
+
+
+@router.get("/suggestions")
+async def suggestions_page(request: Request):
+    return templates.TemplateResponse(request, "suggestions.html", {"error": None})
+
+
+@router.post("/suggestions/generate")
+async def suggestions_generate(request: Request, session: AsyncSession = Depends(get_session)):
+    if not settings.anthropic_api_key:
+        return templates.TemplateResponse(
+            request, "suggestions.html", {"error": "Подбор слов недоступен — не настроен Anthropic API-ключ."}
+        )
+
+    try:
+        candidates = await generate_candidates(session)
+    except Exception:
+        return templates.TemplateResponse(
+            request, "suggestions.html", {"error": "Не удалось получить слова от Claude. Попробуйте ещё раз."}
+        )
+
+    items = [
+        {"english": c.english, "russian": c.russian, "part_of_speech": c.part_of_speech or "", "topic": c.topic}
+        for c in candidates
+    ]
+    return templates.TemplateResponse(request, "suggestions_preview.html", {"items": items})
+
+
+@router.post("/suggestions/confirm")
+async def suggestions_confirm(request: Request, session: AsyncSession = Depends(get_session)):
+    form = await request.form()
+    indices = sorted({key.split("_")[-1] for key in form.keys() if key.startswith("include_")})
+
+    candidates = []
+    for idx in indices:
+        english = (form.get(f"english_{idx}") or "").strip()
+        russian = (form.get(f"russian_{idx}") or "").strip()
+        part_of_speech = (form.get(f"part_of_speech_{idx}") or "").strip() or None
+        topic = (form.get(f"topic_{idx}") or "").strip() or None
+        if not english or not russian:
+            continue
+        candidates.append(
+            SuggestedWord(english=english, russian=russian, part_of_speech=part_of_speech, topic=topic or "")
+        )
+
+    added = await insert_words(session, candidates)
+    return RedirectResponse(url=f"/words?{urlencode({'source': 'suggested'})}" if added else "/words", status_code=303)
 
 
 @router.get("/stats")

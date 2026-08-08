@@ -72,6 +72,17 @@ class AnswerLog(Base):
     word: Mapped["Word"] = relationship(back_populates="answers")
 
 
+class ExcludedWord(Base):
+    """Words deleted from the dictionary — never auto-added again by OCR import or suggestions."""
+
+    __tablename__ = "excluded_words"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    english_key: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    russian_key: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(), default=utcnow, nullable=False)
+
+
 class BotState(Base):
     __tablename__ = "bot_state"
 

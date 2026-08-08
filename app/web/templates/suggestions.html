@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Подбор слов{% endblock %}
+{% block content %}
+<h1>Подбор новых слов</h1>
+<p class="muted">Claude подберёт слова, близкие по тематике к тем, что уже есть в вашем словаре (в основном product-management и IT). Перед добавлением вы сможете отметить, какие слова оставить.</p>
+{% if error %}<p style="color:#d9534f">{{ error }}</p>{% endif %}
+<form method="post" action="/suggestions/generate">
+  <button type="submit">Подобрать новые слова</button>
+</form>
+{% endblock %}
