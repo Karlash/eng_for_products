@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Проверка распознанных слов{% endblock %}
+{% block content %}
+<h1>Распознанные слова</h1>
+
+{% if items %}
+<p class="muted">Найдено {{ items|length }} новых слов (уже существующие пропущены автоматически). Снимите галочки с лишних и подтвердите.</p>
+<form method="post" action="/import/confirm">
+  <table>
+    <thead>
+      <tr><th></th><th>English</th><th>Russian</th><th>Часть речи</th></tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td><input type="checkbox" name="include_{{ loop.index0 }}" checked></td>
+        <td>
+          <input type="hidden" name="english_{{ loop.index0 }}" value="{{ item.english }}">
+          {{ item.english }}
+        </td>
+        <td>
+          <input type="hidden" name="russian_{{ loop.index0 }}" value="{{ item.russian }}">
+          {{ item.russian }}
+        </td>
+        <td>
+          <input type="hidden" name="part_of_speech_{{ loop.index0 }}" value="{{ item.part_of_speech }}">
+          {{ item.part_of_speech or "—" }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div style="margin-top:1rem;">
+    <button type="submit">Добавить выбранные</button>
+    <a class="btn secondary" href="/import">Отмена</a>
+  </div>
+</form>
+{% else %}
+<p class="muted">Новых слов не найдено — все распознанные пары уже есть в словаре.</p>
+<a class="btn secondary" href="/import">Попробовать другое фото</a>
+{% endif %}
+{% endblock %}

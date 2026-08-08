@@ -1,3 +1,5 @@
+import json
+
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -7,7 +9,8 @@ from app.bot.practice import get_bot_state, send_practice_word
 from app.config import settings
 from app.db import async_session
 from app.models import LearningProgress, Word
-from app.services.claude_client import judge_translation
+from app.services.claude_client import judge_translation, ocr_extract_words
+from app.services.dedup import filter_new_pairs
 from app.services.progress import expected_answer, judge_exact, record_answer
 
 router = Router()
@@ -18,8 +21,13 @@ HELP_TEXT = (
     "/add english - russian — добавить слово вручную\n"
     "/stats — статистика\n"
     "/help — эта справка\n\n"
-    "Просто ответьте текстом на присланное слово, чтобы проверить перевод."
+    "Просто ответьте текстом на присланное слово, чтобы проверить перевод.\n\n"
+    "Пришлите фото страницы бумажного словаря, чтобы загрузить слова пачкой — "
+    "бот распознает пары слово–перевод и предложит подтвердить импорт "
+    "(/confirm_import или /cancel)."
 )
+
+MAX_PREVIEW_ITEMS = 25
 
 
 @router.message(Command("start", "help"))
@@ -80,7 +88,93 @@ async def cmd_stats(message: Message) -> None:
 
 @router.message(F.photo)
 async def handle_photo(message: Message) -> None:
-    await message.answer("Импорт слов с фото появится позже — пока добавляйте слова через /add.")
+    if not settings.anthropic_api_key:
+        await message.answer("Импорт фото недоступен — не настроен Anthropic API-ключ.")
+        return
+
+    await message.answer("Распознаю слова на фото...")
+
+    photo = message.photo[-1]
+    file = await message.bot.get_file(photo.file_id)
+    buffer = await message.bot.download_file(file.file_path)
+    image_bytes = buffer.read()
+
+    try:
+        extracted = await ocr_extract_words(image_bytes)
+    except Exception:
+        await message.answer("Не удалось распознать слова на фото. Попробуйте другое фото или /add вручную.")
+        return
+
+    if not extracted:
+        await message.answer("На фото не нашлось пар слово–перевод.")
+        return
+
+    candidates = [(w.english, w.russian) for w in extracted]
+    pos_by_english = {w.english.strip().lower(): w.part_of_speech for w in extracted}
+
+    async with async_session() as session:
+        new_pairs = await filter_new_pairs(session, candidates)
+        state = await get_bot_state(session)
+        if not new_pairs:
+            state.pending_import_json = None
+            await session.commit()
+            await message.answer("Все найденные слова уже есть в словаре — добавлять нечего.")
+            return
+
+        payload = [
+            {"english": en, "russian": ru, "part_of_speech": pos_by_english.get(en.strip().lower())}
+            for en, ru in new_pairs
+        ]
+        state.pending_import_json = json.dumps(payload, ensure_ascii=False)
+        await session.commit()
+
+    preview_lines = [f"{en} — {ru}" for en, ru in new_pairs[:MAX_PREVIEW_ITEMS]]
+    preview = "\n".join(preview_lines)
+    more = f"\n…и ещё {len(new_pairs) - MAX_PREVIEW_ITEMS}" if len(new_pairs) > MAX_PREVIEW_ITEMS else ""
+    await message.answer(
+        f"Найдено {len(new_pairs)} новых слов:\n\n{preview}{more}\n\n"
+        "Добавить их в словарь? /confirm_import — да, /cancel — отмена."
+    )
+
+
+@router.message(Command("confirm_import"))
+async def cmd_confirm_import(message: Message) -> None:
+    async with async_session() as session:
+        state = await get_bot_state(session)
+        if not state.pending_import_json:
+            await message.answer("Нечего подтверждать — сначала пришлите фото словаря.")
+            return
+
+        payload = json.loads(state.pending_import_json)
+        added = 0
+        for item in payload:
+            word = Word(
+                english=item["english"],
+                russian=item["russian"],
+                part_of_speech=item.get("part_of_speech"),
+                source="imported_ocr",
+            )
+            session.add(word)
+            await session.flush()
+            session.add(LearningProgress(word_id=word.id, status="new"))
+            added += 1
+
+        state.pending_import_json = None
+        await session.commit()
+
+    await message.answer(f"Добавлено {added} слов.")
+
+
+@router.message(Command("cancel"))
+async def cmd_cancel_import(message: Message) -> None:
+    async with async_session() as session:
+        state = await get_bot_state(session)
+        if not state.pending_import_json:
+            await message.answer("Нечего отменять.")
+            return
+        state.pending_import_json = None
+        await session.commit()
+    await message.answer("Импорт отменён.")
 
 
 @router.message(F.text)

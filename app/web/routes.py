@@ -1,14 +1,17 @@
 from pathlib import Path
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.db import get_session
 from app.models import AnswerLog, LearningProgress, Word
+from app.services.claude_client import ocr_extract_words
+from app.services.dedup import filter_new_pairs
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -139,7 +142,63 @@ async def delete_word(word_id: int, session: AsyncSession = Depends(get_session)
 
 @router.get("/import")
 async def import_page(request: Request):
-    return templates.TemplateResponse(request, "import.html", {})
+    return templates.TemplateResponse(request, "import.html", {"error": None})
+
+
+@router.post("/import")
+async def import_upload(
+    request: Request,
+    photo: UploadFile,
+    session: AsyncSession = Depends(get_session),
+):
+    if not settings.anthropic_api_key:
+        return templates.TemplateResponse(
+            request, "import.html", {"error": "Импорт недоступен — не настроен Anthropic API-ключ."}
+        )
+
+    image_bytes = await photo.read()
+    if not image_bytes:
+        return templates.TemplateResponse(request, "import.html", {"error": "Файл пустой, попробуйте ещё раз."})
+
+    try:
+        extracted = await ocr_extract_words(image_bytes, photo.content_type or "image/jpeg")
+    except Exception:
+        return templates.TemplateResponse(
+            request, "import.html", {"error": "Не удалось распознать слова на фото. Попробуйте другое фото."}
+        )
+
+    candidates = [(w.english, w.russian) for w in extracted]
+    pos_by_english = {w.english.strip().lower(): (w.part_of_speech or "") for w in extracted}
+    new_pairs = await filter_new_pairs(session, candidates)
+
+    items = [
+        {"english": en, "russian": ru, "part_of_speech": pos_by_english.get(en.strip().lower(), "")}
+        for en, ru in new_pairs
+    ]
+
+    return templates.TemplateResponse(request, "import_preview.html", {"items": items})
+
+
+@router.post("/import/confirm")
+async def import_confirm(request: Request, session: AsyncSession = Depends(get_session)):
+    form = await request.form()
+    indices = sorted({key.split("_")[-1] for key in form.keys() if key.startswith("include_")})
+
+    added = 0
+    for idx in indices:
+        english = (form.get(f"english_{idx}") or "").strip()
+        russian = (form.get(f"russian_{idx}") or "").strip()
+        part_of_speech = (form.get(f"part_of_speech_{idx}") or "").strip() or None
+        if not english or not russian:
+            continue
+        word = Word(english=english, russian=russian, part_of_speech=part_of_speech, source="imported_ocr")
+        session.add(word)
+        await session.flush()
+        session.add(LearningProgress(word_id=word.id, status="new"))
+        added += 1
+
+    await session.commit()
+    return RedirectResponse(url="/words", status_code=303)
 
 
 @router.get("/stats")

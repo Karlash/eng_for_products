@@ -2,5 +2,12 @@
 {% block title %}Импорт фото{% endblock %}
 {% block content %}
 <h1>Импорт слов с фото словаря</h1>
-<p class="muted">Появится в milestone 6 (OCR-импорт). Пока можно добавлять слова вручную или через Telegram-бота.</p>
+<p class="muted">Загрузите фото страницы бумажного словаря — слова распознаются автоматически, вы сможете выбрать, какие добавить.</p>
+{% if error %}<p style="color:#d9534f">{{ error }}</p>{% endif %}
+<form class="stacked" method="post" action="/import" enctype="multipart/form-data">
+  <label>Фото страницы
+    <input type="file" name="photo" accept="image/*" required>
+  </label>
+  <button type="submit">Распознать слова</button>
+</form>
 {% endblock %}
