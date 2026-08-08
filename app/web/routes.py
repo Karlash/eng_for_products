@@ -131,6 +131,46 @@ async def word_detail(request: Request, word_id: int, session: AsyncSession = De
     )
 
 
+@router.get("/words/{word_id}/edit")
+async def edit_word_form(request: Request, word_id: int, session: AsyncSession = Depends(get_session)):
+    word = await session.get(Word, word_id)
+    if word is None:
+        return RedirectResponse(url="/words")
+    return templates.TemplateResponse(request, "word_edit.html", {"word": word, "error": None})
+
+
+@router.post("/words/{word_id}/edit")
+async def edit_word(
+    request: Request,
+    word_id: int,
+    english: str = Form(...),
+    russian: str = Form(...),
+    part_of_speech: str = Form(""),
+    topic: str = Form(""),
+    notes: str = Form(""),
+    session: AsyncSession = Depends(get_session),
+):
+    word = await session.get(Word, word_id)
+    if word is None:
+        return RedirectResponse(url="/words")
+
+    english = english.strip()
+    russian = russian.strip()
+    if not english or not russian:
+        word.english, word.russian = english, russian
+        return templates.TemplateResponse(
+            request, "word_edit.html", {"word": word, "error": "English и Russian обязательны."}
+        )
+
+    word.english = english
+    word.russian = russian
+    word.part_of_speech = part_of_speech or None
+    word.topic = topic.strip() or None
+    word.notes = notes.strip() or None
+    await session.commit()
+    return RedirectResponse(url=f"/words/{word.id}", status_code=303)
+
+
 @router.post("/words/{word_id}/delete")
 async def delete_word(word_id: int, session: AsyncSession = Depends(get_session)):
     word = await session.get(Word, word_id)

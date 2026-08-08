@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Редактировать {{ word.english }}{% endblock %}
+{% block content %}
+<p><a class="muted" href="/words/{{ word.id }}">← Назад к слову</a></p>
+<h1>Редактировать слово</h1>
+{% if error %}<p style="color:#d9534f">{{ error }}</p>{% endif %}
+<form class="stacked" method="post" action="/words/{{ word.id }}/edit">
+  <label>English
+    <input type="text" name="english" required value="{{ word.english }}">
+  </label>
+  <label>Russian
+    <input type="text" name="russian" required value="{{ word.russian }}">
+  </label>
+  <label>Часть речи
+    <select name="part_of_speech">
+      <option value="">—</option>
+      {% for pos in ["noun", "verb", "adjective", "adverb", "phrase", "other"] %}
+        <option value="{{ pos }}" {% if word.part_of_speech == pos %}selected{% endif %}>{{ pos }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Тема
+    <input type="text" name="topic" placeholder="product-management, IT/tech, ..." value="{{ word.topic or '' }}">
+  </label>
+  <label>Заметки / пример
+    <textarea name="notes" rows="3">{{ word.notes or '' }}</textarea>
+  </label>
+  <button type="submit">Сохранить</button>
+</form>
+{% endblock %}

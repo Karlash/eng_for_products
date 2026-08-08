@@ -4,7 +4,7 @@ from app.bot.handlers import router
 from app.bot.middleware import AllowedUserMiddleware
 from app.config import settings
 
-bot = Bot(token=settings.telegram_bot_token)
+bot: Bot | None = Bot(token=settings.telegram_bot_token) if settings.telegram_bot_token else None
 dp = Dispatcher()
 dp.message.middleware(AllowedUserMiddleware())
 dp.include_router(router)
