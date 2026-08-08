@@ -16,9 +16,15 @@
       <option value="{{ t }}" {% if topic == t %}selected{% endif %}>{{ t }}</option>
     {% endfor %}
   </select>
+  <select name="source" onchange="this.form.submit()">
+    <option value="">Все источники</option>
+    {% for key, label in source_labels.items() %}
+      <option value="{{ key }}" {% if source == key %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
   <input type="text" name="q" placeholder="Поиск..." value="{{ q or '' }}">
   <button type="submit">Фильтр</button>
-  {% if status or topic or q %}<a class="btn secondary" href="/words">Сбросить</a>{% endif %}
+  {% if status or topic or source or q %}<a class="btn secondary" href="/words">Сбросить</a>{% endif %}
 </form>
 
 {% if words %}
@@ -29,18 +35,28 @@
       <th>Russian</th>
       <th>Тема</th>
       <th>Статус</th>
+      <th>Источник</th>
       <th>✓ / ✗</th>
     </tr>
   </thead>
   <tbody>
+    {% set ns = namespace(last_date=None) %}
     {% for w, p in words %}
-    <tr>
-      <td><a class="row-link" href="/words/{{ w.id }}">{{ w.english }}</a></td>
-      <td>{{ w.russian }}</td>
-      <td class="muted">{{ w.topic or "—" }}</td>
-      <td><span class="badge {{ p.status }}">{{ p.status }}</span></td>
-      <td class="muted">{{ p.total_correct }} / {{ p.total_wrong }}</td>
-    </tr>
+      {% set current_date = w.created_at.strftime("%d.%m.%Y") %}
+      {% if current_date != ns.last_date %}
+      <tr>
+        <td colspan="6" style="border-bottom:none; padding-top:1.2rem; padding-bottom:0.3rem; font-weight:600; color:var(--muted);">{{ current_date }}</td>
+      </tr>
+      {% set ns.last_date = current_date %}
+      {% endif %}
+      <tr>
+        <td><a class="row-link" href="/words/{{ w.id }}">{{ w.english }}</a></td>
+        <td>{{ w.russian }}</td>
+        <td class="muted">{{ w.topic or "—" }}</td>
+        <td><span class="badge {{ p.status }}">{{ p.status }}</span></td>
+        <td class="muted">{{ source_labels.get(w.source, w.source) }}</td>
+        <td class="muted">{{ p.total_correct }} / {{ p.total_wrong }}</td>
+      </tr>
     {% endfor %}
   </tbody>
 </table>

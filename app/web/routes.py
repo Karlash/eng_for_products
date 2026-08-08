@@ -24,11 +24,19 @@ async def root() -> RedirectResponse:
     return RedirectResponse(url="/words")
 
 
+SOURCE_LABELS = {
+    "manual": "вручную",
+    "imported_ocr": "импорт с фото",
+    "suggested": "подобрано ботом",
+}
+
+
 @router.get("/words")
 async def list_words(
     request: Request,
     status: str = "",
     topic: str = "",
+    source: str = "",
     q: str = "",
     page: int = 1,
     session: AsyncSession = Depends(get_session),
@@ -38,6 +46,8 @@ async def list_words(
         query = query.where(LearningProgress.status == status)
     if topic:
         query = query.where(Word.topic == topic)
+    if source:
+        query = query.where(Word.source == source)
     if q:
         like = f"%{q}%"
         query = query.where((Word.english.ilike(like)) | (Word.russian.ilike(like)))
@@ -54,7 +64,7 @@ async def list_words(
     topics = sorted(t for (t,) in topics_result.all() if t)
 
     def qs(**overrides):
-        params = {"status": status, "topic": topic, "q": q, "page": page}
+        params = {"status": status, "topic": topic, "source": source, "q": q, "page": page}
         params.update(overrides)
         params = {k: v for k, v in params.items() if v}
         return urlencode(params)
@@ -66,8 +76,10 @@ async def list_words(
             "words": rows,
             "total": total,
             "topics": topics,
+            "source_labels": SOURCE_LABELS,
             "status": status,
             "topic": topic,
+            "source": source,
             "q": q,
             "page": page,
             "total_pages": total_pages,
