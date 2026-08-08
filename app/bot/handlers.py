@@ -4,8 +4,10 @@ from aiogram.types import Message
 from sqlalchemy import func, select
 
 from app.bot.practice import get_bot_state, send_practice_word
+from app.config import settings
 from app.db import async_session
 from app.models import LearningProgress, Word
+from app.services.claude_client import judge_translation
 from app.services.progress import expected_answer, judge_exact, record_answer
 
 router = Router()
@@ -100,8 +102,22 @@ async def handle_answer(message: Message) -> None:
             return
 
         user_answer = message.text or ""
-        was_correct = judge_exact(word, direction, user_answer)
-        await record_answer(session, word, direction, user_answer, was_correct, judged_by="normalized_match")
+        claude_explanation = None
+        if judge_exact(word, direction, user_answer):
+            was_correct = True
+            judged_by = "normalized_match"
+        elif settings.anthropic_api_key:
+            result = await judge_translation(word.english, word.russian, direction, user_answer)
+            was_correct = result.correct
+            judged_by = "claude"
+            claude_explanation = result.explanation
+        else:
+            was_correct = False
+            judged_by = "normalized_match"
+
+        await record_answer(
+            session, word, direction, user_answer, was_correct, judged_by=judged_by, claude_explanation=claude_explanation
+        )
 
         state.pending_word_id = None
         state.pending_direction = None
@@ -109,6 +125,11 @@ async def handle_answer(message: Message) -> None:
         await session.commit()
 
     if was_correct:
-        await message.answer("✅ Верно!")
+        text = "✅ Верно!"
+        if claude_explanation:
+            text += f" {claude_explanation}"
     else:
-        await message.answer(f"❌ Неверно. Правильный ответ: {expected_answer(word, direction)}")
+        text = f"❌ Неверно. Правильный ответ: {expected_answer(word, direction)}"
+        if claude_explanation:
+            text += f"\n{claude_explanation}"
+    await message.answer(text)
