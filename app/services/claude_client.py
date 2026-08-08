@@ -23,6 +23,17 @@ class OcrResult(BaseModel):
     words: list[ExtractedWord]
 
 
+class SuggestedWord(BaseModel):
+    english: str
+    russian: str
+    part_of_speech: str | None = None
+    topic: str
+
+
+class SuggestionResult(BaseModel):
+    words: list[SuggestedWord]
+
+
 async def judge_translation(word_english: str, word_russian: str, direction: str, user_answer: str) -> JudgeResult:
     expected = word_russian if direction == "en_to_ru" else word_english
     task = "переведи на русский" if direction == "en_to_ru" else "translate to English"
@@ -72,5 +83,35 @@ async def ocr_extract_words(image_bytes: bytes, media_type: str = "image/jpeg") 
             }
         ],
         output_format=OcrResult,
+    )
+    return response.parsed_output.words
+
+
+async def suggest_new_words(
+    existing_topics: list[str], sample_pairs: list[tuple[str, str]], batch_size: int
+) -> list[SuggestedWord]:
+    topics_str = ", ".join(existing_topics) if existing_topics else "пока нет данных"
+    examples_str = (
+        "\n".join(f"- {en} — {ru}" for en, ru in sample_pairs) if sample_pairs else "(словарь пока пуст)"
+    )
+
+    prompt = (
+        "Ты помогаешь продакт-менеджеру в IT (уровень английского C1) пополнять словарный запас английского.\n"
+        f"Основная тематика — Product Management и IT/технологии, плюс смежные темы, которые уже встречаются "
+        f"в его словаре: {topics_str}.\n\n"
+        f"Вот примеры слов, которые уже есть в словаре (не предлагай их снова и не предлагай синонимы, "
+        f"дублирующие их по смыслу):\n{examples_str}\n\n"
+        f"Предложи {batch_size} новых английских слов или устойчивых выражений уровня C1, полезных для "
+        "продакт-менеджера в IT и смежных тем (аналитика, дизайн, финансы, коммуникация с бизнесом — по ситуации). "
+        "Для каждого укажи русский перевод, часть речи (noun/verb/adjective/adverb/phrase/other) и короткую тему "
+        "(topic) вида 'product-management', 'IT/tech' или другую релевантную метку. "
+        "Избегай слишком базовой лексики (ниже уровня B2) и слов, уже упомянутых выше."
+    )
+
+    response = await _client.messages.parse(
+        model=settings.claude_model_suggest,
+        max_tokens=4096,
+        messages=[{"role": "user", "content": prompt}],
+        output_format=SuggestionResult,
     )
     return response.parsed_output.words

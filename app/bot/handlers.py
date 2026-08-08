@@ -12,6 +12,7 @@ from app.models import LearningProgress, Word
 from app.services.claude_client import judge_translation, ocr_extract_words
 from app.services.dedup import filter_new_pairs
 from app.services.progress import expected_answer, judge_exact, record_answer
+from app.services.suggestions import run_suggestion_top_up
 
 router = Router()
 
@@ -19,6 +20,7 @@ HELP_TEXT = (
     "Команды:\n"
     "/next — прислать слово для практики\n"
     "/add english - russian — добавить слово вручную\n"
+    "/suggest — подобрать новые слова по темам вашего словаря (PM/IT)\n"
     "/stats — статистика\n"
     "/help — эта справка\n\n"
     "Просто ответьте текстом на присланное слово, чтобы проверить перевод.\n\n"
@@ -65,6 +67,19 @@ async def cmd_add(message: Message) -> None:
         await session.commit()
 
     await message.answer(f"Добавлено: {english} — {russian}")
+
+
+@router.message(Command("suggest"))
+async def cmd_suggest(message: Message) -> None:
+    if not settings.anthropic_api_key:
+        await message.answer("Подбор слов недоступен — не настроен Anthropic API-ключ.")
+        return
+    await message.answer("Подбираю новые слова по вашим темам...")
+    added = await run_suggestion_top_up(force=True)
+    if added:
+        await message.answer(f"Добавлено {added} новых слов. Посмотреть — /stats или в веб-словаре.")
+    else:
+        await message.answer("Не удалось подобрать новые уникальные слова — попробуйте позже.")
 
 
 @router.message(Command("stats"))
