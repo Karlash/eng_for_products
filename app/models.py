@@ -91,3 +91,4 @@ class BotState(Base):
     pending_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
     pending_asked_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(), nullable=True)
     pending_import_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    session_remaining: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

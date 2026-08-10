@@ -5,7 +5,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 from sqlalchemy import func, select
 
-from app.bot.practice import get_bot_state, send_practice_word
+from app.bot.practice import continue_session, get_bot_state, send_practice_word
 from app.config import settings
 from app.db import async_session
 from app.models import LearningProgress, Word
@@ -242,3 +242,6 @@ async def handle_answer(message: Message) -> None:
         if claude_explanation:
             text += f"\n{claude_explanation}"
     await message.answer(text)
+
+    async with async_session() as session:
+        await continue_session(message.bot, message.chat.id, session)

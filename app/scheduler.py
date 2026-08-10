@@ -4,7 +4,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from app.bot.bot import bot
-from app.bot.practice import send_practice_word
+from app.bot.practice import start_session
 from app.config import settings
 from app.db import async_session
 from app.services.suggestions import run_suggestion_top_up
@@ -18,7 +18,7 @@ async def scheduled_send_job() -> None:
     if not settings.telegram_allowed_user_id:
         return
     async with async_session() as session:
-        sent = await send_practice_word(bot, settings.telegram_allowed_user_id, session)
+        sent = await start_session(bot, settings.telegram_allowed_user_id, session, settings.words_per_session)
     if not sent:
         logger.info("Scheduled send skipped: nothing due and no new-word quota left.")
 

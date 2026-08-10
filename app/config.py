@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     timezone: str = "Europe/Moscow"
     schedule_times: str = "09:00,14:00,20:00"
     max_new_words_per_day: int = 3
+    words_per_session: int = 3
 
     suggestion_threshold: int = 15
     suggestion_batch_size: int = 20

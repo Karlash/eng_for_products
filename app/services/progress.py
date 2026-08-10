@@ -21,7 +21,9 @@ CYCLE_WINDOW = timedelta(days=30)
 REINFORCEMENT_DELAY = timedelta(days=30)
 RETRY_SOON_DELAY = timedelta(hours=4)
 REQUIRED_CORRECT_IN_CYCLE = 4
-CYCLE_INTERVALS = {1: timedelta(days=1), 2: timedelta(days=2), 3: timedelta(days=4)}
+# Floor of 2 days between repeat exposures (instead of 1) so a word has time
+# to fade a bit before it's asked again, rather than feeling drilled.
+CYCLE_INTERVALS = {1: timedelta(days=2), 2: timedelta(days=4), 3: timedelta(days=7)}
 
 
 def normalize(text: str) -> str:
@@ -57,17 +59,22 @@ async def new_words_sent_today(session: AsyncSession) -> int:
 async def select_word_to_send(session: AsyncSession) -> tuple[Word, str] | None:
     now = utcnow()
 
-    due = (
-        await session.execute(
-            select(Word)
-            .join(LearningProgress)
-            .where(LearningProgress.next_review_at.is_not(None), LearningProgress.next_review_at <= now)
-            .order_by(LearningProgress.next_review_at.asc())
-            .limit(1)
+    # Random among everything currently due, not just the single oldest — a small
+    # dictionary with several words due around the same time otherwise cycles
+    # through them in the same predictable order every session.
+    due_candidates = (
+        (
+            await session.execute(
+                select(Word)
+                .join(LearningProgress)
+                .where(LearningProgress.next_review_at.is_not(None), LearningProgress.next_review_at <= now)
+            )
         )
-    ).scalar_one_or_none()
-    if due is not None:
-        return due, pick_direction()
+        .scalars()
+        .all()
+    )
+    if due_candidates:
+        return random.choice(due_candidates), pick_direction()
 
     if await new_words_sent_today(session) < settings.max_new_words_per_day:
         new_word = (
