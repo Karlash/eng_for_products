@@ -241,6 +241,8 @@ async def handle_answer(message: Message) -> None:
         text = f"❌ Неверно. Правильный ответ: {expected_answer(word, direction)}"
         if claude_explanation:
             text += f"\n{claude_explanation}"
+    if word.notes:
+        text += f"\n📝 {word.notes}"
     await message.answer(text)
 
     async with async_session() as session:
