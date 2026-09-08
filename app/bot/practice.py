@@ -1,4 +1,5 @@
 from aiogram import Bot
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import BotState, utcnow
@@ -32,7 +33,10 @@ async def send_practice_word(bot: Bot, chat_id: int, session: AsyncSession) -> b
         text = f"🇬🇧 {word.english}\n\nПереведи на русский:"
     else:
         text = f"🇷🇺 {word.russian}\n\nTranslate to English:"
-    await bot.send_message(chat_id, text)
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="Не знаю", callback_data="dont_know")]]
+    )
+    await bot.send_message(chat_id, text, reply_markup=keyboard)
     return True
 
 

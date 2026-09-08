@@ -2,7 +2,7 @@ import json
 
 from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy import func, select
 
 from app.bot.practice import continue_session, get_bot_state, send_practice_word
@@ -190,6 +190,31 @@ async def cmd_cancel_import(message: Message) -> None:
         state.pending_import_json = None
         await session.commit()
     await message.answer("Импорт отменён.")
+
+
+@router.callback_query(F.data == "dont_know")
+async def handle_dont_know(callback: CallbackQuery) -> None:
+    await callback.answer()
+    async with async_session() as session:
+        state = await get_bot_state(session)
+        word = await session.get(Word, state.pending_word_id) if state.pending_word_id else None
+        direction = state.pending_direction
+        if word is None or direction is None:
+            return
+
+        await record_answer(session, word, direction, None, False, judged_by="gave_up")
+        state.pending_word_id = None
+        state.pending_direction = None
+        state.pending_asked_at = None
+        await session.commit()
+
+    text = f"Правильный ответ: {expected_answer(word, direction)}"
+    if word.notes:
+        text += f"\n📝 {word.notes}"
+    await callback.message.answer(text)
+
+    async with async_session() as session:
+        await continue_session(callback.bot, callback.message.chat.id, session)
 
 
 @router.message(F.text)

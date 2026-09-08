@@ -7,6 +7,7 @@ from app.config import settings
 bot: Bot | None = Bot(token=settings.telegram_bot_token) if settings.telegram_bot_token else None
 dp = Dispatcher()
 dp.message.middleware(AllowedUserMiddleware())
+dp.callback_query.middleware(AllowedUserMiddleware())
 dp.include_router(router)
 
 
